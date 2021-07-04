@@ -7,27 +7,28 @@ services:
     build:
       context: ${ZIRCON_DIR}
       dockerfile: Dockerfile.dev
-    command: ["bash", "-c", "echo test"]
+    # command: ["bash", "-c", "echo test"]
+    command: ["tail", "-f", "/dev/null"]
     volumes:
       - ${ZIRCON_DIR}:/usr/src/app:rw
     ports:
       - "8081:8081"
       - "9870:9870"
-    depends_on:
-      patricia:
-          condition: service_healthy
-  zircon-proto:
+    # depends_on:
+    #   patricia:
+    #       condition: service_healthy
+  zircon_proto:
   # Not actually using postgres, update after docker image is built
-    image: postgres:11
+    image: myriadeinc/zircon_proto:724e6a8b1276d7665cc95182eb50018d5f1bcc80
     environment:
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_USER=postgres
-      - POSTGRES_DB=myriade
-      - PGPORT=5431
+      - NODE_PATH=src/
+    #   - POSTGRES_USER=postgres
+    #   - POSTGRES_DB=myriade
+    #   - PGPORT=5431
     ports:
-      - "5431:5431"
-    healthcheck:
-      test: "pg_isready -h localhost -p 5431 -q -U postgres"
-      interval: 1s
-      timeout: 1s
-      retries: 100
+      - "8088:8088"
+    # healthcheck:
+    #   test: "pg_isready -h localhost -p 5431 -q -U postgres"
+    #   interval: 1s
+    #   timeout: 1s
+    #   retries: 100

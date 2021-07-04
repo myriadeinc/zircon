@@ -6,9 +6,9 @@ RUN useradd gouser && usermod -a -G root gouser && mkdir /home/gouser
 RUN chown gouser:gouser /home/gouser
 
 USER gouser
-RUN go install github.com/githubnemo/CompileDaemon
+RUN go get github.com/githubnemo/CompileDaemon
 
-RUN go mod download
+# RUN go mod download
 
-ENTRYPOINT CompileDaemon --build="go build -o ./build/zircon cmd/main.go" --command="./build/zircon"
+# ENTRYPOINT CompileDaemon --build="go build -o ./build/zircon cmd/main.go" --command="./build/zircon"
 # CMD tail -f /dev/null

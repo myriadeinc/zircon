@@ -5,13 +5,13 @@ import (
 	"log"
 	"time"
 
-	pb "github.com/myriadeinc/zircon-proto"
+	zirconbuf "github.com/myriadeinc/zircon_proto"
 	"google.golang.org/grpc"
 	prototext "google.golang.org/protobuf/encoding/prototext"
 )
 
 const (
-	address = "localhost:8088"
+	address = "zircon_proto:8088"
 )
 
 func main() {
@@ -22,24 +22,25 @@ func main() {
 		log.Fatalf("did not connect: %v", err)
 	}
 	defer conn.Close()
-	c := pb.NewZirconClient(conn)
+
+	c := zirconbuf.NewZirconClient(conn)
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	pbb := pb.Block{
+	zirconbufb := zirconbuf.Block{
 		HexResult: "0c456307f6681606439dcfebfa890473d10dc85fdadf3da4909b9e1838380000",
 		// HexNonce:   "0c456307f6681606439dcfebfa890473d10dc85fdadf3da4909b9e1838380000",
 		GlobalDiff: "12345670",
 		LocalDiff:  "10000000",
 	}
-	r, err := c.ProcessBlock(ctx, &pbb)
+
+	r, err := c.ValidateBlock(ctx, &zirconbufb)
 	if err != nil {
 		log.Fatalf("could not call: %v", err)
 	}
-	if r.GetBlockStatus() == pb.PatriciaBlockResponse_VALID {
+	if r.GetBlockStatus() == zirconbuf.BlockResponse_VALID {
 		log.Println("valid one!")
 	}
-	// log.Printf("We got: %s", r.GetTest())
 
 	log.Printf(prototext.Format(r))
 
