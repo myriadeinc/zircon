@@ -1,0 +1,14 @@
+FROM golang:1.16.5-buster
+WORKDIR /usr/src/app
+COPY ./ /usr/src/app
+RUN useradd gouser && usermod -a -G root gouser && mkdir /home/gouser
+# Home directory for managing go imports
+RUN chown gouser:gouser /home/gouser
+
+USER gouser
+RUN go install github.com/githubnemo/CompileDaemon
+
+RUN go mod download
+
+ENTRYPOINT CompileDaemon --build="go build -o ./build/zircon cmd/main.go" --command="./build/zircon"
+# CMD tail -f /dev/null

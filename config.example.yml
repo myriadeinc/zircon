@@ -1,0 +1,28 @@
+version: '3.8'
+services:
+  zircon:
+    logging:
+      options:
+        max-size: "10m"
+    environment:
+      service__shared_secret: 5e27500b-2838-4fb3-b2e8-2587101829c8
+      emerald__url: amqp://guest:guest@mq:5672/
+      emerald__port: 32345
+      control__port: 9990
+      proxy__port: 12345
+      tls__cert_example: |-
+          -----BEGIN PUBLIC KEY-----
+          MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAqyMv2GuBP/41rx4Gich3
+          qTnKuBd2XdnifiSpBvrS0uiRsM4O4G/W4NghA1ymQi3/cXJ0qVipZ4eCy1vIl7R6
+          Pyl+YqBrzB4iOzgZ0qNJpabGcIZBgBe7hwIKd+0EXdxsGmtx/0YAvTnt5LXtBw4w
+          woXqsjeuwgqztMN36sQWb6Qpq0Ee5T0nV3jD8H6Ol9T4egRrh/u781tnouuD1fZy
+          pLvVVZtn0GULy10wKeN83THwNc/Z/p0jUnJvQ17t1Hp/4TmqVYeLoQdjG/WqSxs7
+          hS+p5dsPcwsCbbAzEYKgAdYWNFgaF0wGBduQ0sNgg6dwlYtFN4MKR9xVsmMrhQCs
+          w3nJl7c+otU6YCQy+1iqwDqvN3vdFsFNePP1Xkbza4sS4rg8QT6FKJ94lXFyyl9I
+          rsGZZnNNqPPdctJJP5+/lEYIP1ZrNJV96GVmyhklI+yLoC0XeibrQOoxCm+DiXyX
+          VBNrFiZznvUin9mjqf1p/TYsMAuhBbJt0NpaT/Iutg5D376YfahXVF4UrA3hdW9Y
+          6Jn4MIS8qwD89yDtZn1UUwx6kFSDp/ESahBWHKXyNVNDZtAZMl2bF1CbdJ2lTw88
+          NsRLAmjxH6dRoTGlNhdXOlU3XYtt7W9pnx6YIboXa+FT7hYlxps29pK4Mahlfg5J
+          DoDzjDSrn8hmjVscLHQ9Tm8CAwEAAQ==
+          -----END PUBLIC KEY-----
+  
