@@ -5,6 +5,8 @@ import (
 	"log"
 	"time"
 
+	server "github.com/myriadeinc/zircon/internal/server"
+
 	zirconbuf "github.com/myriadeinc/zircon_proto"
 	"google.golang.org/grpc"
 	prototext "google.golang.org/protobuf/encoding/prototext"
@@ -42,6 +44,12 @@ func main() {
 		log.Println("valid one!")
 	}
 
-	log.Printf(prototext.Format(r))
+	log.Println(prototext.Format(r))
+
+	log.Println(server.Hello())
+
+	rpc := server.NewRpcServer()
+	log.Printf("v2")
+	rpc.Listen("0.0.0.0:9870")
 
 }

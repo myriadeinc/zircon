@@ -7,6 +7,14 @@ import (
 
 
 
+func (job *JobData) updateTarget() JobData {
+	// Parse as int64 in base 10
+	target, _ := strconv.ParseInt(job.Target, 10, 64)
+	job.Target = GetTargetHex(target)
+	return *job
+}
+
+
 func CreateJob(ctx context.Context) {
 	bt := GetBlockTemplate()
 // create nonce

@@ -7,7 +7,6 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"os"
 	"sync"
 	"time"
 
@@ -36,7 +35,7 @@ type StratumSession struct {
 	minerId string
 }
 
-func New() *RpcServer {
+func NewRpcServer() *RpcServer {
 	rpcServer := &RpcServer{}
 	rpcServer.sessions = make(map[*StratumSession]struct{})
 	rpcServer.NewClient()
@@ -44,7 +43,7 @@ func New() *RpcServer {
 }
 
 func (r *RpcServer) NewClient() {
-	r.Client = jsonrpc.NewClient("http://localhost:22345")
+	r.Client = jsonrpc.NewClient("http://node.melo.tools/json_rpc:18081")
 }
 
 type TestResp struct {
@@ -66,30 +65,19 @@ type JSONRpcReq struct {
 type JSONRpcResp struct {
 	Id      *json.RawMessage `json:"id"`
 	Version string           `json:"jsonrpc"`
-	Result  interface{}      `json:"result"`
-	Error   interface{}      `json:"error"`
+	Result  *json.RawMessage `json:"result"`
+	Error   *json.RawMessage `json:"error"`
 }
 
 // Push Job to XMRig
 type JSONRpcPushMessage struct {
-	Version string      `json:"jsonrpc"`
-	Method  string      `json:"method"`
-	Params  interface{} `json:"params"`
+	Version string           `json:"jsonrpc"`
+	Method  string           `json:"method"`
+	Params  *json.RawMessage `json:"params"`
 }
 
-func (r *RpcServer) ListenHTTP() {
-	var port string = ":4990"
-	http.HandleFunc("/jobfeed", r.Jobfeed)
-	log.Info().Msgf("Listening on %s%s:%s", os.Getenv("service__local__name"), port, "/jobfeed")
-	http.ListenAndServe(port, nil)
-
-}
-
+// bindAddr : 0.0.0.0:$port
 func (r *RpcServer) Listen(bindAddr string) {
-	// bindAddr := fmt.Sprintf("%s:%d", e.config.Host, e.config.Port)
-	// Init TCP server
-	// var port int = 8222
-	// bindAddr := fmt.Sprintf("%s:%d", "0.0.0.0", port)
 	addr, err := net.ResolveTCPAddr("tcp", bindAddr)
 	if err != nil {
 		log.Fatal().Err(err)
@@ -124,7 +112,7 @@ func (r *RpcServer) Listen(bindAddr string) {
 
 func (r *RpcServer) handleClient(st *StratumSession) {
 	connbuff := bufio.NewReaderSize(st.conn, MaxReqSize)
-	//stet max connection timeout
+	// Set max connection timeout
 	duration := time.Second * time.Duration(360)
 	st.conn.SetDeadline(time.Now().Add(duration))
 
