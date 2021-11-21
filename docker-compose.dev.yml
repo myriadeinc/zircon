@@ -6,10 +6,13 @@ services:
       service: zircon
     build:
       context: ${ZIRCON_DIR}
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.dev
+    command: ["tail", "-f", "/dev/null"]
+    volumes:
+      - ${ZIRCON_DIR}:/zircon:rw
     ports:
       - "8081:8081"
-      - "12345:12345"
+      - "9870:9870"
   redis:
     image: redis:6.2.4
     ports:
