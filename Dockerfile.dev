@@ -1,9 +1,9 @@
 FROM golang:1.16.5-buster
 WORKDIR /usr/src/app
 COPY ./ /usr/src/app
-RUN useradd gouser && usermod -a -G root gouser && mkdir /home/gouser
+RUN useradd gouser --home /usr/src/app --uid 1000 
 # Home directory for managing go imports
-RUN chown gouser:gouser /home/gouser
+RUN chown -R gouser:gouser /usr/src/app
 
 USER gouser
 RUN go get github.com/githubnemo/CompileDaemon

@@ -7,26 +7,22 @@ services:
     build:
       context: ${ZIRCON_DIR}
       dockerfile: Dockerfile.dev
-    # command: ["bash", "-c", "echo test"]
     command: ["tail", "-f", "/dev/null"]
     volumes:
       - ${ZIRCON_DIR}:/usr/src/app:rw
     ports:
       - "8081:8081"
       - "9870:9870"
-    # depends_on:
-    #   patricia:
-    #       condition: service_healthy
-  zircon_proto:
-    image: myriadeinc/zircon_proto:724e6a8b1276d7665cc95182eb50018d5f1bcc80
-    environment:
-      - NODE_PATH=src/
-    ports:
-      - "8088:8088"
+  # zircon_proto:
+  #   image: myriadeinc/zircon_proto:724e6a8b1276d7665cc95182eb50018d5f1bcc80
+  #   environment:
+  #     - NODE_PATH=src/
+  #   ports:
+  #     - "8088:8088"
     # healthcheck:
-    #   test: "pg_isready -h localhost -p 5431 -q -U postgres"
-    #   interval: 1s
-    #   timeout: 1s
+    #   test: "curl -f http://localhost:8088 || exit 1 "
+    #   interval: 3s
+    #   timeout: 3s
     #   retries: 100
   redis:
     image: redis:6.2.4
