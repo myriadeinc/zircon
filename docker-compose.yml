@@ -2,13 +2,11 @@ version: '3.8'
 services:
   zircon:
     extends:
-      file: config.yml
+      file: docker.config.yml
       service: zircon
     build:
       context: ${ZIRCON_DIR}
       dockerfile: Dockerfile
-    volumes:
-      - ${ZIRCON_DIR}:/zircon:rw
     ports:
       - "8081:8081"
       - "12345:12345"

@@ -2,7 +2,7 @@ version: '3.8'
 services:
   zircon:
     extends:
-      file: config.yml
+      file: docker.config.yml
       service: zircon
     build:
       context: ${ZIRCON_DIR}

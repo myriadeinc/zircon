@@ -13,7 +13,7 @@
 *.out
 
 # Myriade standard
-config.yml
+docker.config.yml
 run.go
 
 # CMake

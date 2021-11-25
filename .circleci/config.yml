@@ -1,0 +1,67 @@
+version: 3.8
+executors:
+  docker-publisher:
+    environment:
+      IMAGE_NAME: myriadeinc/zircon
+    docker:
+      - image: cimg/go:1.16.5
+        auth:
+          username: $DOCKERHUB_USERNAME
+          password: $DOCKERHUB_PASS
+
+jobs:
+  build:
+    executor: docker-publisher
+    steps:
+      - checkout
+      - setup_remote_docker
+      - run:
+          name: Reticulating splines
+          command: |
+            echo Running for $IMAGE_NAME
+      - run:
+          name: Build Docker image
+          command: |
+            TAG=$CIRCLE_SHA1 make build
+      - run:
+          name: Archive Docker image
+          command: docker save -o image.tar $IMAGE_NAME
+      - persist_to_workspace:
+          root: .
+          paths:
+            - ./image.tar
+  publish-latest:
+    executor: docker-publisher
+    steps:
+      - attach_workspace:
+          at: /tmp/workspace
+      - setup_remote_docker
+      - run:
+          name: Load archived Docker image
+          command: docker load -i /tmp/workspace/image.tar
+      - run:
+          name: Publish Docker Image to Docker Hub
+          command: |
+            echo "$DOCKERHUB_PASS" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+            docker push $IMAGE_NAME:$CIRCLE_SHA1
+workflows:
+  version: 2
+  build:
+    jobs:
+      - build:
+          filters:
+            branches:
+              only: 
+                - main
+                - master
+                - develop
+      - publish-latest:
+          requires:
+            - build
+          filters:
+            branches:
+              only: 
+                - main
+                - master
+                - develop           
+
