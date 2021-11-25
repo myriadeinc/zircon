@@ -6,6 +6,7 @@ import (
 	"io"
 	"net"
 	"sync"
+	"time"
 
 	"github.com/myriadeinc/zircon/internal/stratum"
 	"github.com/rs/zerolog/log"
@@ -18,11 +19,22 @@ type StratumSession struct {
 	minerId string
 }
 
+func (s *StratumSession) closeSession() {
+	s.conn.Close()
+	GetSessionHandler().removeSession(s)
+	if r := recover(); r != nil {
+		log.Error().Err(r.(error))
+	}
+}
+
 func (s *StratumSession) handleSession() {
-	defer s.conn.Close()
-	defer GetServerInstance().removeSession(s)
+	defer s.closeSession()
+
+	timeoutDuration := 5 * time.Second
 	clientReader := bufio.NewReader(s.conn)
+
 	for {
+		s.conn.SetReadDeadline(time.Now().Add(timeoutDuration))
 		// Could be long buffer, but at least we handle errors
 		clientRequest, err := clientReader.ReadBytes('\n')
 		switch err {
@@ -36,7 +48,7 @@ func (s *StratumSession) handleSession() {
 			log.Debug().Msg("Client disconnected")
 			return
 		default:
-			log.Fatal().Msg("Error connectiuon")
+			log.Fatal().Msg("Error connection")
 			return
 		}
 	}
@@ -47,6 +59,9 @@ func (s *StratumSession) handleRequest(rawRequest []byte) error {
 	jsonErr := json.Unmarshal(rawRequest, &request)
 	if jsonErr != nil {
 		return jsonErr
+	}
+	if request.Method == "login" {
+		s.minerId = request.ParseMinerId()
 	}
 	needNewJob, response, stratumErr := request.GetStratumResponse()
 	if stratumErr != nil {

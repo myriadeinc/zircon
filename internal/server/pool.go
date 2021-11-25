@@ -9,27 +9,33 @@ import (
 )
 
 type PoolServer struct {
-	Client     jsonrpc.RPCClient
+	Client jsonrpc.RPCClient
+}
+
+type SessionHandler struct {
 	SessionsMu sync.RWMutex
 	Sessions   map[*StratumSession]struct{}
 }
 
 var once sync.Once
-var singleInstance *PoolServer
+var sessionHandler *SessionHandler
 
-func GetServerInstance() *PoolServer {
-	if singleInstance == nil {
+func GetSessionHandler() *SessionHandler {
+	if sessionHandler == nil {
 		once.Do(
 			func() {
-				singleInstance = New()
+				sessionMap := make(map[*StratumSession]struct{})
+				sessionHandler = &SessionHandler{
+					Sessions: sessionMap,
+				}
 			})
 	}
-	return singleInstance
+	return sessionHandler
 }
 
 func New() *PoolServer {
 	poolServer := &PoolServer{}
-	poolServer.Sessions = make(map[*StratumSession]struct{})
+	_ = GetSessionHandler()
 	return poolServer
 }
 
@@ -50,24 +56,24 @@ func (s *PoolServer) Listen(bindAddr string) {
 	for {
 		conn, err := server.AcceptTCP()
 		if err != nil {
-			// Continue attempting to receive requests
 			log.Fatal().Err(err)
-			continue
+			return
 		}
 		conn.SetKeepAlive(true)
 		ip, _, _ := net.SplitHostPort(conn.RemoteAddr().String())
 		st := &StratumSession{conn: conn, ip: ip}
-		s.registerSession(st)
+		sessions := GetSessionHandler()
+		sessions.registerSession(st)
 		go st.handleSession()
 	}
 }
 
-func (s *PoolServer) removeSession(session *StratumSession) {
+func (s *SessionHandler) removeSession(session *StratumSession) {
 	s.SessionsMu.Lock()
 	defer s.SessionsMu.Unlock()
 	delete(s.Sessions, session)
 }
-func (s *PoolServer) registerSession(session *StratumSession) {
+func (s *SessionHandler) registerSession(session *StratumSession) {
 	s.SessionsMu.Lock()
 	defer s.SessionsMu.Unlock()
 	s.Sessions[session] = struct{}{}

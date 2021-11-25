@@ -13,6 +13,20 @@ type JSONRpcReq struct {
 	Params *json.RawMessage `json:"params"`
 }
 
+// Set a default minerId so that we can collect metrics down the line
+const funnelMinerId = "699f06ec-9756-4d42-a470-7bf5f104f0e2"
+
+func (r *JSONRpcReq) ParseMinerId() string {
+	loginData := make(map[string]string)
+	err := json.Unmarshal(*r.Params, &loginData)
+	if _, exists := loginData["login"]; !exists || err != nil {
+		log.Error().Msg("Could not parse minerId")
+		return funnelMinerId
+	}
+	return loginData["login"]
+
+}
+
 func (r *JSONRpcReq) GetStratumResponse() (bool, []byte, error) {
 	needNewJob := false
 	var jsonBody []byte
