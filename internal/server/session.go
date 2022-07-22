@@ -20,12 +20,14 @@ type StratumSession struct {
 	conn    *net.TCPConn
 	ip      string
 	minerId string
+	service stratum.StratumService
 }
 
-func NewSession(ip string, connection *net.TCPConn) *StratumSession {
+func NewSession(ip string, connection *net.TCPConn, service stratum.StratumService) *StratumSession {
 	return &StratumSession{
-		ip:   ip,
-		conn: connection,
+		ip:      ip,
+		conn:    connection,
+		service: service,
 	}
 }
 
@@ -37,10 +39,12 @@ func (s *StratumSession) closeSession() {
 		log.Error().Err(r.(error))
 	}
 }
+
 func isEmptyRequest(rawRequest []byte) bool {
 	s := strings.TrimSpace(string(rawRequest))
 	return len(s) == 0
 }
+
 func (s *StratumSession) handleSession() {
 	defer s.closeSession()
 
@@ -55,7 +59,8 @@ func (s *StratumSession) handleSession() {
 		if isEmptyRequest(clientRequest) {
 			continue
 		}
-		// log.Debug().Msgf("Raw read : %s", string(clientRequest))
+		log.Debug().Msgf("Raw read : %s", string(clientRequest))
+		// Aggressively close session for any errors encountered
 		switch err {
 		case nil:
 			requestErr := s.handleRequest(clientRequest)
@@ -78,15 +83,40 @@ func (s *StratumSession) handleRequest(rawRequest []byte) error {
 	var request JSONRpcReq
 	jsonErr := json.Unmarshal(rawRequest, &request)
 	if jsonErr != nil {
+		log.Fatal().Err(jsonErr)
 		return jsonErr
 	}
-	if request.Method == "login" {
-		s.minerId = request.ParseMinerId()
+	// if request.Method == "login" {
+	// 	s.minerId = request.ParseMinerId()
+	// }
+	s.minerId = "00001111-1111-4222-8333-abc123456789"
+
+	var handleErr error
+	var response []byte
+	var needNewJob bool
+
+	log.Debug().Msg("Did I even reach here?")
+	switch request.Method {
+	case "login":
+		job := s.service.HandleLogin(request.Id)
+		response, handleErr = json.Marshal(job)
+	case "submit":
+		ok, newJob := s.service.HandleSubmit(request.Id)
+		needNewJob = newJob
+		response, handleErr = json.Marshal(ok)
+	default:
+		unknownMethod := map[string]string{
+			"message": "unknownMethod",
+		}
+		response, handleErr = json.Marshal(unknownMethod)
 	}
-	needNewJob, response, stratumErr := request.GetStratumResponse(s.minerId)
-	if stratumErr != nil {
-		return stratumErr
+	if handleErr != nil {
+		log.Fatal().Err(handleErr)
+		log.Debug().Msg("oopsie!")
+		return handleErr
 	}
+	log.Debug().Msgf("Request was %v", request)
+	log.Debug().Msgf("Received request, response is %s", string(response))
 
 	response = append(response, byte('\n'))
 	_, writeErr := s.conn.Write(response)
@@ -98,68 +128,8 @@ func (s *StratumSession) handleRequest(rawRequest []byte) error {
 }
 
 func (s *StratumSession) triggerNewJob() {
-	job := stratum.GetDummyJobWrapper()
+	job := s.service.HandleNewJob()
 	bytes, _ := json.Marshal(job)
 	bytes = append(bytes, byte('\n'))
 	s.conn.Write(bytes)
 }
-
-// func (st *StratumSession) sendResult(id *json.RawMessage, result interface{}, err error) error {
-// 	if err != nil {
-// 		message := JSONRpcResp{Id: id, Version: "2.0", Error: err, Result: nil}
-// 		return st.enc.Encode(&message)
-// 	}
-// 	st.Lock()
-// 	defer st.Unlock()
-// 	message := JSONRpcResp{Id: id, Version: "2.0", Error: nil, Result: result}
-// 	return st.enc.Encode(&message)
-// }
-
-// // Push notification
-// func (st *StratumSession) sendJob(result interface{}) error {
-// 	st.Lock()
-// 	defer st.Unlock()
-// 	message := JSONRpcPushMessage{Version: "2.0", Method: "job", Params: result}
-// 	return st.enc.Encode(&message)
-// }
-
-// func (st *StratumSession) handleMessage(r *RpcServer, req *JSONRpcReq) error {
-// 	if req.Id == nil {
-// 		err := fmt.Errorf("Request ID Null")
-// 		log.Error().Err(err)
-// 		return err
-// 	} else if req.Params == nil {
-// 		err := fmt.Errorf("Request Params Empty")
-// 		log.Error().Err(err)
-// 		return err
-// 	}
-
-// 	// Handle RPC methods
-// 	switch req.Method {
-// 	case "login":
-// 		r.registerSession(st)
-// 		log.Debug().Msg(fmt.Sprintf("Login from %s", st.ip))
-// 		miner := struct{
-// 			uuid string `json:"login"`
-// 		}{}
-// 		err := json.Unmarshal(req.Params, &miner)
-// 		if err != nil {
-// 			return err
-// 		}
-// 		var loginJob := stratum.Login(miner.uuid)
-// 		// Save data so we can recall for job
-// 		st.minerId = miner.uuid
-// 		return st.sendResult(req.Id, loginJob, nil)
-// 	case "getjob":
-// 		return st.sendResult(req.Id, nil, nil)
-// 	case "submit":
-// 		log.Debug().Msg(fmt.Sprintf("Submission from %s", st.ip))
-// 		result := stratum.Submit(req.Params)
-// 		return st.sendResult(req.Id, result, nil)
-// 	case "keepalived":
-// 		return st.sendResult(req.Id, &StatusReply{Status: "KEEPALIVED"}, nil)
-// 	default:
-// 		// Should actually mark as error true
-// 		return st.sendResult(req.Id, &ErrorReply{Code: -1, Message: "Invalid method"}, nil)
-// 	}
-// }

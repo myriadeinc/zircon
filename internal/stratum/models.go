@@ -11,6 +11,24 @@ type LoginRequest struct {
 	Agent   string `json:"agent"`
 }
 
+type SubmitResponse struct {
+	Id      *json.RawMessage  `json:"id"`
+	Version string            `json:"jsonrpc"`
+	Result  map[string]string `json:"result"`
+}
+
+type LoginResponse struct {
+	Id      *json.RawMessage `json:"id"`
+	Version string           `json:"jsonrpc"`
+	Result  JobWrapper       `json:"result"`
+}
+
+type JobResponse struct {
+	Version string `json:"jsonrpc"`
+	Method  string `json:"method"`
+	Params  Job    `json:"params"`
+}
+
 type DummyOk struct {
 	Id      *json.RawMessage `json:"id"`
 	Version string           `json:"jsonrpc"`

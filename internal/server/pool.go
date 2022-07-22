@@ -2,39 +2,22 @@ package server
 
 import (
 	"net"
-	"sync"
+
+	"github.com/myriadeinc/zircon/internal/stratum"
 
 	"github.com/rs/zerolog/log"
 	"github.com/ybbus/jsonrpc"
 )
 
 type PoolServer struct {
-	Client jsonrpc.RPCClient
-}
-
-type SessionHandler struct {
-	SessionsMu sync.RWMutex
-	Sessions   map[*StratumSession]struct{}
-}
-
-var once sync.Once
-var sessionHandler *SessionHandler
-
-func GetSessionHandler() *SessionHandler {
-	if sessionHandler == nil {
-		once.Do(
-			func() {
-				sessionMap := make(map[*StratumSession]struct{})
-				sessionHandler = &SessionHandler{
-					Sessions: sessionMap,
-				}
-			})
-	}
-	return sessionHandler
+	Client  jsonrpc.RPCClient
+	Stratum stratum.StratumService
 }
 
 func New() *PoolServer {
-	poolServer := &PoolServer{}
+	poolServer := &PoolServer{
+		Stratum: stratum.GetDummyStratumService(),
+	}
 	_ = GetSessionHandler()
 	return poolServer
 }
@@ -52,29 +35,19 @@ func (s *PoolServer) Listen(bindAddr string) {
 	}
 	defer server.Close()
 
-	log.Info().Msgf("Server started! listening on %s", bindAddr)
+	log.Info().Msgf("xmrig compatible server started! listening on %s", bindAddr)
 	for {
 		conn, err := server.AcceptTCP()
 		if err != nil {
 			log.Fatal().Err(err)
 			return
 		}
+		// Fire and forget sessions
 		conn.SetKeepAlive(true)
 		ip, _, _ := net.SplitHostPort(conn.RemoteAddr().String())
-		st := NewSession(ip, conn)
+		st := NewSession(ip, conn, s.Stratum)
 		sessions := GetSessionHandler()
-		sessions.registerSession(st)
+		sessions.addSession(st)
 		go st.handleSession()
 	}
-}
-
-func (s *SessionHandler) removeSession(session *StratumSession) {
-	s.SessionsMu.Lock()
-	defer s.SessionsMu.Unlock()
-	delete(s.Sessions, session)
-}
-func (s *SessionHandler) registerSession(session *StratumSession) {
-	s.SessionsMu.Lock()
-	defer s.SessionsMu.Unlock()
-	s.Sessions[session] = struct{}{}
 }

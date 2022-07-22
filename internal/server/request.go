@@ -6,7 +6,6 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/myriadeinc/zircon/internal/stratum"
 	"github.com/rs/zerolog/log"
 )
 
@@ -39,29 +38,4 @@ func (r *JSONRpcReq) ParseMinerId() string {
 
 	return minerId
 
-}
-
-func (r *JSONRpcReq) GetStratumResponse(minerId string) (bool, []byte, error) {
-	needNewJob := false
-	var jsonBody []byte
-	var jsonErr error
-
-	switch r.Method {
-	case "login":
-		// log.Debug().Msgf("Login call for %s", minerId)
-		job := stratum.GetDummyResponse(r.Id)
-		jsonBody, jsonErr = json.Marshal(job)
-	case "submit":
-		// log.Debug().Msgf("Submit call for %s", minerId)
-		ok := stratum.GetDummyOk(r.Id)
-		jsonBody, jsonErr = json.Marshal(ok)
-		needNewJob = true
-	default:
-		unkownMethod := struct {
-			Message string `json:"message"`
-		}{Message: "unknownMethod"}
-		jsonBody, jsonErr = json.Marshal(unkownMethod)
-	}
-
-	return needNewJob, jsonBody, jsonErr
 }
