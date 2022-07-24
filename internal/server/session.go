@@ -59,13 +59,12 @@ func (s *StratumSession) handleSession() {
 		if isEmptyRequest(clientRequest) {
 			continue
 		}
-		log.Debug().Msgf("Raw read : %s", string(clientRequest))
 		// Aggressively close session for any errors encountered
 		switch err {
 		case nil:
 			requestErr := s.handleRequest(clientRequest)
 			if requestErr != nil {
-				log.Error().Msg("Disconnecting due to request process error")
+				log.Error().Err(requestErr).Msg("Disconnecting due to request process error")
 				return
 			}
 			continue
@@ -73,7 +72,7 @@ func (s *StratumSession) handleSession() {
 			log.Debug().Msgf("EOF on %s", s.ip)
 			return
 		default:
-			log.Fatal().Msg("Error encountered while reading from connection")
+			log.Error().Msg("Error encountered while reading from connection")
 			return
 		}
 	}
@@ -83,53 +82,80 @@ func (s *StratumSession) handleRequest(rawRequest []byte) error {
 	var request JSONRpcReq
 	jsonErr := json.Unmarshal(rawRequest, &request)
 	if jsonErr != nil {
-		log.Fatal().Err(jsonErr)
+		log.Error().Err(jsonErr).Msg("error unmarshaling request")
 		return jsonErr
 	}
-	// if request.Method == "login" {
-	// 	s.minerId = request.ParseMinerId()
-	// }
-	s.minerId = "00001111-1111-4222-8333-abc123456789"
+	if request.Method == "login" {
+		s.minerId = request.ParseMinerId()
+	}
 
 	var handleErr error
 	var response []byte
-	var needNewJob bool
 
-	log.Debug().Msg("Did I even reach here?")
+	log.Trace().Msgf("Raw request : %s", string(rawRequest))
+
 	switch request.Method {
 	case "login":
-		job := s.service.HandleLogin(request.Id)
+		job, err := s.service.HandleLogin(request.Id, s.minerId)
+		if err != nil {
+			response = genericErrorResponse(request.Id)
+			break
+		}
 		response, handleErr = json.Marshal(job)
 	case "submit":
-		ok, newJob := s.service.HandleSubmit(request.Id)
-		needNewJob = newJob
+		ok, err := s.service.HandleSubmit(request.Id, request.Params)
+		if err != nil {
+			response = genericErrorResponse(request.Id)
+			break
+		}
 		response, handleErr = json.Marshal(ok)
 	default:
-		unknownMethod := map[string]string{
-			"message": "unknownMethod",
-		}
-		response, handleErr = json.Marshal(unknownMethod)
+		response = genericErrorResponse(request.Id)
 	}
 	if handleErr != nil {
-		log.Fatal().Err(handleErr)
-		log.Debug().Msg("oopsie!")
+		log.Error().Err(handleErr).Msg("Could not process incoming request")
 		return handleErr
 	}
-	log.Debug().Msgf("Request was %v", request)
-	log.Debug().Msgf("Received request, response is %s", string(response))
+	log.Trace().
+		Str("request",
+			string(rawRequest)).
+		Str("response",
+			string(response)).
+		Msg("processed request")
 
 	response = append(response, byte('\n'))
 	_, writeErr := s.conn.Write(response)
-	// Since we have two potential writes to socket, need to handle this concurrently in the future
-	if needNewJob {
-		go s.triggerNewJob()
+	if writeErr != nil {
+		return writeErr
 	}
-	return writeErr
+	return nil
 }
 
-func (s *StratumSession) triggerNewJob() {
-	job := s.service.HandleNewJob()
+func (s *StratumSession) triggerNewJob() error {
+	job, err := s.service.HandleNewJob(s.minerId)
+	if err != nil {
+		return err
+	}
 	bytes, _ := json.Marshal(job)
+
 	bytes = append(bytes, byte('\n'))
-	s.conn.Write(bytes)
+	log.Trace().Msgf("Pushing new job %s", string(bytes))
+
+	_, err = s.conn.Write(bytes)
+	return err
+}
+
+func genericErrorResponse(id *json.RawMessage) []byte {
+	response := map[string]interface{}{
+		"id":      id,
+		"jsonrpc": "2.0",
+		"error": map[string]interface{}{
+			"code":    -1,
+			"message": "Internal server error",
+		},
+	}
+
+	bytes, _ := json.Marshal(response)
+	return bytes
+
 }

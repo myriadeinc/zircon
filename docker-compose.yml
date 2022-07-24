@@ -8,8 +8,8 @@ services:
       context: ${ZIRCON_DIR}
       dockerfile: Dockerfile
     ports:
-      - "8081:8081"
-      - "12345:12345"
+      - "8222:8222"
+      - "4990:4990"
   redis:
     image: redis:6.2.4
     ports:

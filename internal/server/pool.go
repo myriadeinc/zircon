@@ -16,7 +16,7 @@ type PoolServer struct {
 
 func New() *PoolServer {
 	poolServer := &PoolServer{
-		Stratum: stratum.GetDummyStratumService(),
+		Stratum: stratum.NewStratumRPCService(),
 	}
 	_ = GetSessionHandler()
 	return poolServer

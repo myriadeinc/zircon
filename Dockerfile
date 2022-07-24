@@ -7,6 +7,6 @@ RUN chown -R gouser:gouser /zircon
 
 USER gouser
 RUN go mod download
-RUN go build -o ./zircon cmd/zircon/zircon.go
+RUN go build -o ./zircon cmd/xmrig_server/xmrig_server.go
 
 CMD ["/zircon/zircon"]

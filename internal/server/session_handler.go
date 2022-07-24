@@ -2,11 +2,13 @@ package server
 
 import (
 	"sync"
+
+	"github.com/rs/zerolog/log"
 )
 
 type SessionHandler struct {
-	SessionsMu sync.RWMutex
-	Sessions   map[*StratumSession]struct{}
+	sync.RWMutex
+	Sessions map[*StratumSession]struct{}
 }
 
 var once sync.Once
@@ -25,13 +27,32 @@ func GetSessionHandler() *SessionHandler {
 	return sessionHandler
 }
 
+func (s *SessionHandler) BroadcastNewJobs() {
+	log.Info().Msg("broadcasting new jobs")
+	s.RLock()
+	defer s.RUnlock()
+	var wg sync.WaitGroup
+	wg.Add(len(s.Sessions))
+	for session := range s.Sessions {
+		go func(sess *StratumSession) {
+			log.Trace().Msgf("trigger new job for %s", sess.ip)
+			err := sess.triggerNewJob()
+			if err != nil {
+				log.Error().Err(err).Msgf("Could not send msg to session %s", sess.ip)
+			}
+			wg.Done()
+		}(session)
+	}
+	wg.Wait()
+}
+
 func (s *SessionHandler) removeSession(session *StratumSession) {
-	s.SessionsMu.Lock()
-	defer s.SessionsMu.Unlock()
+	s.Lock()
+	defer s.Unlock()
 	delete(s.Sessions, session)
 }
 func (s *SessionHandler) addSession(session *StratumSession) {
-	s.SessionsMu.Lock()
-	defer s.SessionsMu.Unlock()
+	s.Lock()
+	defer s.Unlock()
 	s.Sessions[session] = struct{}{}
 }
