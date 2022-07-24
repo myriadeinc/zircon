@@ -20,6 +20,12 @@ func main() {
 	config.DefaultConfigs()
 	viper.AutomaticEnv()
 
+	useTraceLevel := viper.GetBool("TRACE_LOGS")
+	zerolog.SetGlobalLevel(zerolog.DebugLevel)
+	if useTraceLevel {
+		zerolog.SetGlobalLevel(zerolog.TraceLevel)
+	}
+
 	pool := server.New()
 	go func() {
 		server.ListenWebhook()

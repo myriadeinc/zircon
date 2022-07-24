@@ -91,6 +91,7 @@ func (s *StratumSession) handleRequest(rawRequest []byte) error {
 
 	var handleErr error
 	var response []byte
+	var pushNewJob bool
 
 	log.Trace().Msgf("Raw request : %s", string(rawRequest))
 
@@ -109,6 +110,7 @@ func (s *StratumSession) handleRequest(rawRequest []byte) error {
 			break
 		}
 		response, handleErr = json.Marshal(ok)
+		pushNewJob = true
 	default:
 		response = genericErrorResponse(request.Id)
 	}
@@ -127,6 +129,9 @@ func (s *StratumSession) handleRequest(rawRequest []byte) error {
 	_, writeErr := s.conn.Write(response)
 	if writeErr != nil {
 		return writeErr
+	}
+	if pushNewJob {
+		return s.triggerNewJob()
 	}
 	return nil
 }

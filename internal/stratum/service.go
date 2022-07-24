@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/rs/zerolog/log"
@@ -22,11 +23,25 @@ type StratumRPCService struct {
 	patriciaClient *rpc.Client
 }
 
+func reconnect(waitTime int) *rpc.Client {
+	time.Sleep(time.Duration(waitTime))
+	client, err := rpc.Dial(viper.GetString("WS_RPC_URL"))
+	if err != nil {
+		log.Error().Err(err).Int("waitTime", waitTime).Msg("Reconnect triggered : could not contact websocket patricia, trying again")
+		return reconnect(waitTime * 2)
+	}
+	return client
+}
+
 func NewStratumRPCService() StratumService {
+	waitTime := 5000000000 // 5 seconds
+	time.Sleep(time.Duration(waitTime))
 	client, err := rpc.Dial(viper.GetString("WS_RPC_URL"))
 	if err != nil {
 		log.Error().Err(err).Msg("Could not contact websocket patricia")
+		client = reconnect(waitTime)
 	}
+	log.Info().Msg("successfully connected to rpc websocket server")
 	service := &StratumRPCService{
 		patriciaClient: client,
 	}
@@ -35,7 +50,7 @@ func NewStratumRPCService() StratumService {
 }
 
 func (s *StratumRPCService) HandleLogin(id *json.RawMessage, minerId string) (*LoginResponse, error) {
-
+	// We use maps instead of explicit structs to check for contents easily
 	minerJob := map[string]string{}
 
 	err := s.patriciaClient.Call(&minerJob, "newjob", map[string]string{"miner": minerId})
@@ -47,6 +62,10 @@ func (s *StratumRPCService) HandleLogin(id *json.RawMessage, minerId string) (*L
 		log.Error().Msg("No target diff in miner job")
 		return nil, errors.New("did not receive expected payload")
 	}
+	if len(minerJob) == 0 {
+		return nil, errors.New("received empty payload")
+	}
+
 	minerJob["target"] = convertDifficultyToHex(minerJob["target"])
 
 	log.Trace().Str("minerJob", fmt.Sprint(minerJob)).Msg("got minerJob")
@@ -85,7 +104,6 @@ func (s *StratumRPCService) HandleSubmit(id *json.RawMessage, params *json.RawMe
 		log.Error().Err(err).Msg("could not contact patricia client for submitjob")
 		return nil, err
 	}
-	// log.Info().Msgf("received value from patricia : %v", response)
 
 	if accepted, ok := response["accepted"]; ok && accepted {
 		submitOk := &SubmitResponse{
@@ -97,6 +115,9 @@ func (s *StratumRPCService) HandleSubmit(id *json.RawMessage, params *json.RawMe
 		}
 
 		return submitOk, nil
+	}
+	if len(response) == 0 {
+		return nil, errors.New("received empty response")
 	}
 
 	return nil, errors.New("block not accepted")
@@ -112,6 +133,11 @@ func (s *StratumRPCService) HandleNewJob(minerId string) (*JobResponse, error) {
 		return nil, err
 	}
 	log.Trace().Str("minerJob", fmt.Sprint(minerJob)).Msg("Received new job to push from patricia")
+
+	if len(minerJob) == 0 {
+		return nil, errors.New("received empty payload")
+	}
+
 	minerJob["target"] = convertDifficultyToHex(minerJob["target"])
 
 	newjob := &JobResponse{

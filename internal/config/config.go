@@ -8,6 +8,7 @@ type ConfigKeys struct {
 }
 
 func DefaultConfigs() {
-	viper.Set("WS_RPC_URL", "ws://0.0.0.0:9877")
+	viper.SetDefault("WS_RPC_URL", "ws://0.0.0.0:9877")
+	viper.SetDefault("TRACE_LOGS", false)
 
 }
