@@ -30,7 +30,7 @@ workflows:
           requires:
             - test
           image: $CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME
-          tag: 'latest,$CIRCLE_BUILD_NUM'
+          tag: 'latest'
           filters:
             branches:
               only: 
