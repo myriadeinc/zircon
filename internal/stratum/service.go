@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/rpc"
@@ -20,33 +21,63 @@ type StratumService interface {
 }
 
 type StratumRPCService struct {
+	rpcLock        sync.Mutex
 	patriciaClient *rpc.Client
 }
 
-func reconnect(waitTime int) *rpc.Client {
-	time.Sleep(time.Duration(waitTime))
+func reconnect(waitTime time.Duration) *rpc.Client {
+	time.Sleep(waitTime)
 	client, err := rpc.Dial(viper.GetString("WS_RPC_URL"))
 	if err != nil {
-		log.Error().Err(err).Int("waitTime", waitTime).Msg("Reconnect triggered : could not contact websocket patricia, trying again")
+		log.Error().Err(err).Str("waitTime", waitTime.String()).Msg("Reconnect triggered : could not contact websocket patricia, trying again")
 		return reconnect(waitTime * 2)
 	}
 	return client
 }
 
 func NewStratumRPCService() StratumService {
-	waitTime := 5000000000 // 5 seconds
-	time.Sleep(time.Duration(waitTime))
+
+	service := &StratumRPCService{}
+
+	service.connectRPC()
+	log.Info().Msg("successfully connected to rpc websocket server")
+
+	return service
+}
+
+func (s *StratumRPCService) connectRPC() {
+	s.rpcLock.Lock()
+	defer s.rpcLock.Unlock()
+	waitTime := 5 * time.Second
+
 	client, err := rpc.Dial(viper.GetString("WS_RPC_URL"))
+
 	if err != nil {
 		log.Error().Err(err).Msg("Could not contact websocket patricia")
 		client = reconnect(waitTime)
 	}
-	log.Info().Msg("successfully connected to rpc websocket server")
-	service := &StratumRPCService{
-		patriciaClient: client,
-	}
+	s.patriciaClient = client
+}
 
-	return service
+func (s *StratumRPCService) reconnectRPC() {
+	ack := map[string]bool{}
+	err := s.patriciaClient.Call(&ack, "ack", nil)
+	if err == nil {
+		return
+	}
+	log.Error().Err(err).Msg("could not dial websocket, attempting reconnect")
+
+	s.rpcLock.Lock()
+	defer s.rpcLock.Unlock()
+	waitTime := 5 * time.Second
+
+	client, err := rpc.Dial(viper.GetString("WS_RPC_URL"))
+
+	if err != nil {
+		log.Error().Err(err).Msg("Could not contact websocket patricia")
+		client = reconnect(waitTime)
+	}
+	s.patriciaClient = client
 }
 
 func (s *StratumRPCService) HandleLogin(id *json.RawMessage, minerId string) (*LoginResponse, error) {
@@ -55,7 +86,9 @@ func (s *StratumRPCService) HandleLogin(id *json.RawMessage, minerId string) (*L
 
 	err := s.patriciaClient.Call(&minerJob, "newjob", map[string]string{"miner": minerId})
 	if err != nil {
-		log.Error().Err(err).Msg("could not contact patricia client")
+
+		log.Error().Err(err).Msg("could not call newjob")
+		go s.reconnectRPC()
 		return nil, err
 	}
 	if _, ok := minerJob["target"]; !ok {
@@ -102,6 +135,7 @@ func (s *StratumRPCService) HandleSubmit(id *json.RawMessage, params *json.RawMe
 	err = s.patriciaClient.Call(&response, "submitjob", job_params)
 	if err != nil {
 		log.Error().Err(err).Msg("could not contact patricia client for submitjob")
+		go s.reconnectRPC()
 		return nil, err
 	}
 

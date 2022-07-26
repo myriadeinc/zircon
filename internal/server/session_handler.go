@@ -38,7 +38,7 @@ func (s *SessionHandler) BroadcastNewJobs() {
 			log.Trace().Msgf("trigger new job for %s", sess.ip)
 			err := sess.triggerNewJob()
 			if err != nil {
-				log.Error().Err(err).Msgf("Could not send msg to session %s", sess.ip)
+				log.Error().Err(err).Msgf("Could not push msg to session %s", sess.ip)
 			}
 			wg.Done()
 		}(session)
