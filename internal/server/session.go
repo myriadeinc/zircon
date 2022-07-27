@@ -111,6 +111,15 @@ func (s *StratumSession) handleRequest(rawRequest []byte) error {
 		}
 		response, handleErr = json.Marshal(ok)
 		pushNewJob = true
+	case "keepalived":
+		keepalive := map[string]interface{}{
+			"id":      request.Id,
+			"jsonrpc": "2.0",
+			"result": map[string]string{
+				"status": "KEEPALIVED",
+			},
+		}
+		response, _ = json.Marshal(keepalive)
 	default:
 		response = genericErrorResponse(request.Id)
 	}

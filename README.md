@@ -1,3 +1,3 @@
 # zircon
-Nonfunctioning lightweight mining pool with reliance on external APIs
+Mining pool connection handler, relying on node.js lib via websockets for job creation and validation.
 
