@@ -3,6 +3,7 @@ package server
 import (
 	"net"
 
+	"github.com/myriadeinc/zircon/internal/cache"
 	"github.com/myriadeinc/zircon/internal/stratum"
 
 	"github.com/rs/zerolog/log"
@@ -12,11 +13,13 @@ import (
 type PoolServer struct {
 	Client  jsonrpc.RPCClient
 	Stratum stratum.StratumService
+	Cache   cache.CacheService
 }
 
 func New() *PoolServer {
 	poolServer := &PoolServer{
 		Stratum: stratum.NewStratumRPCService(),
+		Cache:   cache.NewClient(),
 	}
 	_ = GetSessionHandler()
 	return poolServer
@@ -45,7 +48,7 @@ func (s *PoolServer) Listen(bindAddr string) {
 		// Fire and forget sessions
 		conn.SetKeepAlive(true)
 		ip, _, _ := net.SplitHostPort(conn.RemoteAddr().String())
-		st := NewSession(ip, conn, s.Stratum)
+		st := NewSession(ip, conn, s.Stratum, s.Cache)
 		sessions := GetSessionHandler()
 		sessions.addSession(st)
 		go st.handleSession()

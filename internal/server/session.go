@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/myriadeinc/zircon/internal/cache"
 	"github.com/myriadeinc/zircon/internal/stratum"
 	"github.com/rs/zerolog/log"
 )
@@ -21,13 +22,15 @@ type StratumSession struct {
 	ip      string
 	minerId string
 	service stratum.StratumService
+	cache   cache.CacheService
 }
 
-func NewSession(ip string, connection *net.TCPConn, service stratum.StratumService) *StratumSession {
+func NewSession(ip string, connection *net.TCPConn, service stratum.StratumService, cache cache.CacheService) *StratumSession {
 	return &StratumSession{
 		ip:      ip,
 		conn:    connection,
 		service: service,
+		cache:   cache,
 	}
 }
 
@@ -78,6 +81,22 @@ func (s *StratumSession) handleSession() {
 	}
 }
 
+func (s *StratumSession) createLoginRequest(minerId string) (map[string]string, error) {
+	template, err := s.cache.FetchTemplate()
+	if err != nil {
+		return nil, err
+	}
+	params := map[string]string{
+		"miner":            minerId,
+		"templateBlob":     template.BlockTemplateBlob,
+		"templateHeight":   template.Height,
+		"templateDiff":     template.Difficulty,
+		"templateSeedhash": template.SeedHash,
+	}
+
+	return params, nil
+}
+
 func (s *StratumSession) handleRequest(rawRequest []byte) error {
 	var request JSONRpcReq
 	jsonErr := json.Unmarshal(rawRequest, &request)
@@ -97,7 +116,12 @@ func (s *StratumSession) handleRequest(rawRequest []byte) error {
 
 	switch request.Method {
 	case "login":
-		job, err := s.service.HandleLogin(request.Id, s.minerId)
+		params, err := s.createLoginRequest(s.minerId)
+		if err != nil {
+			response = genericErrorResponse(request.Id)
+			break
+		}
+		job, err := s.service.HandleLoginWithTemplate(request.Id, params)
 		if err != nil {
 			response = genericErrorResponse(request.Id)
 			break
@@ -146,7 +170,11 @@ func (s *StratumSession) handleRequest(rawRequest []byte) error {
 }
 
 func (s *StratumSession) triggerNewJob() error {
-	job, err := s.service.HandleNewJob(s.minerId)
+	params, err := s.createLoginRequest(s.minerId)
+	if err != nil {
+		return err
+	}
+	job, err := s.service.HandleNewJob(params)
 	if err != nil {
 		return err
 	}

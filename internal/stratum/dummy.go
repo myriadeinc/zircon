@@ -9,7 +9,9 @@ func GetDummyStratumService() StratumService {
 	dummyService := &DummyStratumService{}
 	return dummyService
 }
-
+func (d *DummyStratumService) HandleLoginWithTemplate(id *json.RawMessage, params map[string]string) (*LoginResponse, error) {
+	return d.HandleLogin(id, params["miner"])
+}
 func (d *DummyStratumService) HandleLogin(id *json.RawMessage, minerId string) (*LoginResponse, error) {
 
 	return &LoginResponse{
@@ -39,7 +41,7 @@ func (d *DummyStratumService) HandleSubmit(id *json.RawMessage, result *json.Raw
 		},
 	}, nil
 }
-func (d *DummyStratumService) HandleNewJob(minerId string) (*JobResponse, error) {
+func (d *DummyStratumService) HandleNewJob(params map[string]string) (*JobResponse, error) {
 	return &JobResponse{
 		Version: "2.0",
 		Method:  "job",

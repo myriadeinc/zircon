@@ -13,11 +13,9 @@ import (
 )
 
 type StratumService interface {
-	HandleLogin(*json.RawMessage, string) (*LoginResponse, error)
-
+	HandleLoginWithTemplate(*json.RawMessage, map[string]string) (*LoginResponse, error)
 	HandleSubmit(*json.RawMessage, *json.RawMessage) (*SubmitResponse, error)
-
-	HandleNewJob(string) (*JobResponse, error)
+	HandleNewJob(map[string]string) (*JobResponse, error)
 }
 
 type StratumRPCService struct {
@@ -80,14 +78,14 @@ func (s *StratumRPCService) reconnectRPC() {
 	s.patriciaClient = client
 }
 
-func (s *StratumRPCService) HandleLogin(id *json.RawMessage, minerId string) (*LoginResponse, error) {
+func (s *StratumRPCService) HandleLoginWithTemplate(id *json.RawMessage, params map[string]string) (*LoginResponse, error) {
 	// We use maps instead of explicit structs to check for contents easily
 	minerJob := map[string]string{}
 
-	err := s.patriciaClient.Call(&minerJob, "newjob", map[string]string{"miner": minerId})
+	err := s.patriciaClient.Call(&minerJob, "newtemplatejob", params)
 	if err != nil {
 
-		log.Error().Err(err).Msg("could not call newjob")
+		log.Error().Err(err).Msg("could not call newtemplatejob")
 		go s.reconnectRPC()
 		return nil, err
 	}
@@ -158,12 +156,12 @@ func (s *StratumRPCService) HandleSubmit(id *json.RawMessage, params *json.RawMe
 
 }
 
-func (s *StratumRPCService) HandleNewJob(minerId string) (*JobResponse, error) {
+func (s *StratumRPCService) HandleNewJob(params map[string]string) (*JobResponse, error) {
 	minerJob := map[string]string{}
 
-	err := s.patriciaClient.Call(&minerJob, "newjob", map[string]string{"miner": minerId})
+	err := s.patriciaClient.Call(&minerJob, "newtemplatejob", params)
 	if err != nil {
-		log.Error().Err(err).Msg("could not fetch new job")
+		log.Error().Err(err).Msg("could not fetch new job with newtemplatejob")
 		return nil, err
 	}
 	log.Trace().Str("minerJob", fmt.Sprint(minerJob)).Msg("Received new job to push from patricia")
