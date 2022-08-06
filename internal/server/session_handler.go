@@ -28,19 +28,23 @@ func GetSessionHandler() *SessionHandler {
 }
 
 func (s *SessionHandler) BroadcastNewJobs() {
-	log.Info().Msg("broadcasting new jobs")
 	badSessions := []*StratumSession{}
 	s.Lock()
 	defer s.Unlock()
 	var wg sync.WaitGroup
-	wg.Add(len(s.Sessions))
+	numSessions := len(s.Sessions)
+	wg.Add(numSessions)
+	log.Info().Int("nsessions", numSessions).Msg("broadcasting new jobs")
+	activeSessions := 0
 	for session := range s.Sessions {
 		go func(sess *StratumSession) {
 			log.Trace().Msgf("trigger new job for %s", sess.ip)
 			err := sess.triggerNewJob()
 			if err != nil {
-				log.Error().Err(err).Msgf("Could not push msg to session %s", sess.ip)
+				log.Error().Err(err).Str("ip", sess.ip).Msg("Could not push msg to session")
 				badSessions = append(badSessions, sess)
+			} else {
+				activeSessions++
 			}
 			wg.Done()
 		}(session)
@@ -49,6 +53,7 @@ func (s *SessionHandler) BroadcastNewJobs() {
 	for _, session := range badSessions {
 		s.removeSession(session)
 	}
+	log.Info().Int("nsessions", activeSessions).Msg("Sucessfully broadcasted jobs")
 }
 
 func (s *SessionHandler) removeSession(session *StratumSession) {
