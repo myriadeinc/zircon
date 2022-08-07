@@ -6,18 +6,18 @@ import (
 	// "time"
 
 	"os"
+	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
 	config "github.com/myriadeinc/zircon/internal/config"
-	poller "github.com/myriadeinc/zircon/internal/poller"
 	server "github.com/myriadeinc/zircon/internal/server"
 	"github.com/spf13/viper"
 )
 
 func main() {
-	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC3339})
 	config.DefaultConfigs()
 	viper.AutomaticEnv()
 
@@ -30,12 +30,10 @@ func main() {
 	config.DumpConfigs()
 
 	pool := server.New()
-	p := poller.NewPoller()
-	go func() {
-		p.PollForever()
 
-	}()
+	// We don't really need to do this because we do reconnects, but still helpful
+	time.Sleep(10 * time.Second)
 
-	pool.Listen("0.0.0.0:8222")
+	pool.Start("0.0.0.0:8222")
 
 }

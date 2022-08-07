@@ -3,29 +3,22 @@ package cache
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 
+	"github.com/myriadeinc/zircon/internal/models"
 	"github.com/spf13/viper"
 
 	"github.com/go-redis/redis/v8"
 )
 
 type CacheService interface {
-	SaveNewTemplate(map[string]interface{}) error
-	FetchTemplate() (*StrictTemplate, error)
-}
-
-// Instead of map[string]string because the redis library only has support to serialize a struct
-type StrictTemplate struct {
-	BlockTemplateBlob string `json:"blocktemplate_blob"`
-	Difficulty        string `json:"difficulty"`
-	SeedHash          string `json:"seed_hash"`
-	Height            string `json:"height"`
+	SaveNewTemplate(models.StrictTemplate) error
+	FetchTemplate() (*models.StrictTemplate, error)
 }
 
 type RedisService struct {
-	client *redis.Client
+	client       *redis.Client
+	minerRecords map[string]struct{}
 }
 
 func NewClient() CacheService {
@@ -36,42 +29,52 @@ func NewClient() CacheService {
 		DB:       0,  // use default DB
 	})
 	return &RedisService{
-		client: rdb,
+		client:       rdb,
+		minerRecords: map[string]struct{}{},
 	}
 
 }
 
 const key = "blocktemplate"
 
-func (r *RedisService) SaveNewTemplate(template map[string]interface{}) error {
-
-	redisTemplate := StrictTemplate{
-		BlockTemplateBlob: fmt.Sprintf("%v", template["blocktemplate_blob"]),
-		SeedHash:          fmt.Sprintf("%v", template["seed_hash"]),
-		// Horrible yes, but desired as they are parsed as floats but should be uint
-		Difficulty: fmt.Sprintf("%d", uint64(template["difficulty"].(float64))),
-		Height:     fmt.Sprintf("%d", uint64(template["height"].(float64))),
-	}
-
-	return r.client.Set(context.Background(), key, redisTemplate, 0).Err()
+func (r *RedisService) SaveNewTemplate(template models.StrictTemplate) error {
+	return r.client.Set(context.Background(), key, template, 0).Err()
 }
 
-func (r *RedisService) FetchTemplate() (*StrictTemplate, error) {
+func (r *RedisService) FetchTemplate() (*models.StrictTemplate, error) {
 	jsonString, err := r.client.Get(context.Background(), key).Result()
 	if err != nil {
 		return nil, err
 	}
-	var template StrictTemplate
+	var template models.StrictTemplate
 	err = json.Unmarshal([]byte(jsonString), &template)
 	if err != nil {
 		return nil, err
 	}
-	if len(template.BlockTemplateBlob) == 0 {
-		return nil, errors.New("template has no blob")
+	if !template.IsValid() {
+		return nil, fmt.Errorf("expected full template, received %v", template)
 	}
 	return &template, nil
 }
 
-func (s StrictTemplate) MarshalBinary() ([]byte, error) {
-	return json.Marshal(s)
+func (r *RedisService) UpsertMinerDifficulty(minerId string, blockHeight string, difficulty uint64) error {
+	r.minerRecords[minerId] = struct{}{}
+	key := fmt.Sprintf("%s_%s", blockHeight, minerId)
+	return r.client.Set(context.Background(), key, difficulty, 0).Err()
+}
+
+func (r *RedisService) clearMiners() {
+	r.minerRecords = map[string]struct{}{}
+}
+
+func (r *RedisService) FlushMiners(blockHeight string) error {
+	defer r.clearMiners()
+	for minerId := range r.minerRecords {
+		key := fmt.Sprintf("%s_%s", blockHeight, minerId)
+		_, err := r.client.Get(context.Background(), key).Result()
+		return err
+	}
+
+	return nil
+
 }

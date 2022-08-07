@@ -1,4 +1,4 @@
-FROM golang:1.16.5-buster
+FROM golang:1.19-buster AS builder
 WORKDIR /zircon
 COPY . /zircon
 RUN useradd gouser --home /zircon --uid 1000 
@@ -7,6 +7,10 @@ RUN chown -R gouser:gouser /zircon
 
 USER gouser
 RUN go mod download
-RUN go build -o ./zircon cmd/xmrig_server/xmrig_server.go
+RUN CGO_ENABLED=0 go build -o ./zircon cmd/xmrig_server/xmrig_server.go
 
-CMD ["/zircon/zircon"]
+FROM alpine:3.16
+WORKDIR /app/
+COPY --from=builder /zircon/zircon ./
+
+CMD ["./zircon"]

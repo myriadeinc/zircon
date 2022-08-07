@@ -167,7 +167,7 @@ func (s *StratumRPCService) HandleNewJob(params map[string]string) (*JobResponse
 	log.Trace().Str("minerJob", fmt.Sprint(minerJob)).Msg("Received new job to push from patricia")
 
 	if len(minerJob) == 0 {
-		return nil, errors.New("received empty payload")
+		return nil, fmt.Errorf("received empty payload from patricia")
 	}
 
 	minerJob["target"] = convertDifficultyToHex(minerJob["target"])
