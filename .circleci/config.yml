@@ -12,9 +12,6 @@ jobs:
           name: Go mod download
           command: go mod download
       - run:
-          name: Go get t
-          command: go get -t .
-      - run:
           name: Go test 
           command: go test ./...
 
